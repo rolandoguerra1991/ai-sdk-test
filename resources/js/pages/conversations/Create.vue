@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { create } from '@/routes/conversations';
+import { create, store } from '@/routes/conversations';
 import ChatAgent from '@/components/ChatAgent.vue';
 
 defineOptions({
@@ -19,17 +19,19 @@ const form = useForm({
     attachments: [],
 });
 
-async function onSubmit(message: string, attachments: any[]): Promise<void> {
-    // Handle the submission of the message and attachments here
-    console.log('Message:', message);
-    console.log('Attachments:', attachments);
+function submit() {
+    form.post(store().url);
 }
+
 </script>
 
 <template>
     <Head title="New Conversation" />
 
     <ChatAgent
-        :on-submit="onSubmit"
-        :processing="form.processing" />
+        :on-submit="submit"
+        :processing="form.processing"
+        v-model:messageInput="form.message"
+        v-model:pendingAttachments="form.attachments"
+     />
 </template>

@@ -24,11 +24,11 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ref } from 'vue';
+import { defineModel } from 'vue';
 
 const props = defineProps<{
     conversation?: Conversation;
-    onSubmit: (message: string, attachments: Attachment[]) => void;
+    onSubmit: () => void;
     processing: boolean;
 }>()
 
@@ -40,22 +40,28 @@ const attachmentIcons: Record<AttachmentKind, typeof FileText> = {
 
 const messages: ChatMessage[] = [];
 
-const pendingAttachments: Attachment[] = [];
+const pendingAttachments = defineModel('pendingAttachments', {
+    type: Array as () => Attachment[],
+    default: () => [],
+});
 
 const isThinking = false;
 
 const suggestedPrompts: string[] = [];
 
-const messageInput = ref('');
+const messageInput = defineModel('messageInput', {
+    type: String,
+    default: '',
+});
 
 function submit(): void {
     if (messageInput.value.trim() === '') {
         return;
     }
 
-    props.onSubmit(messageInput.value, pendingAttachments);
+    props.onSubmit();
     messageInput.value = '';
-    pendingAttachments.length = 0;
+    pendingAttachments.value.length = 0;
 }
 </script>
 

@@ -22,8 +22,11 @@ class ConversationController extends Controller
     public function store(Request $request)
     {
         try {
-            $response = (new Assistant)->prompt($request->input('message'));
-            to_route('conversations.show', $response->conversationId);
+            $response = (new Assistant)
+                ->forUser($request->user())
+                ->prompt($request->input('message'));
+
+            return to_route('conversations.show', $response->conversationId);
         } catch (\Throwable $th) {
             return back()->withErrors(['message' => $th->getMessage()]);
         }
