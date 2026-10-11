@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid, Sparkles } from '@lucide/vue';
+import { Link, usePage } from '@inertiajs/vue3';
+import { BookOpen, FolderGit2, LayoutGrid, Sparkles, MessageSquare } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,8 +15,12 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { create as conversationCreate } from '@/routes/conversations';
+import { create as conversationCreate, show as conversationShow } from '@/routes/conversations';
 import type { NavItem } from '@/types';
+import { computed } from 'vue';
+import NavConversations from '@/components/NavConversations.vue';
+
+const page = usePage();
 
 const mainNavItems: NavItem[] = [
     {
@@ -30,6 +34,14 @@ const mainNavItems: NavItem[] = [
         icon: Sparkles,
     }
 ];
+
+const recentConversations = computed<NavItem[]>(() => {
+    return page.props.conversations.map((conversation) => ({
+        title: conversation.title,
+        href: conversationShow(conversation.id),
+        icon: MessageSquare,
+    }));
+});
 
 const footerNavItems: NavItem[] = [
     {
@@ -61,6 +73,9 @@ const footerNavItems: NavItem[] = [
 
         <SidebarContent>
             <NavMain :items="mainNavItems" />
+            <NavConversations
+                v-if="recentConversations.length > 0"
+                :items="recentConversations" />
         </SidebarContent>
 
         <SidebarFooter>
