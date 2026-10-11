@@ -2,7 +2,7 @@
 import {
     Attachment,
     AttachmentKind,
-    ChatMessage,
+    Message,
     Conversation
 } from '@/types/conversation';
 
@@ -24,7 +24,8 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { defineModel } from 'vue';
+import { defineModel, ref } from 'vue';
+import { formatDate } from '@/lib/utils';
 
 const props = defineProps<{
     conversation?: Conversation;
@@ -38,7 +39,7 @@ const attachmentIcons: Record<AttachmentKind, typeof FileText> = {
     document: FileText,
 };
 
-const messages: ChatMessage[] = [];
+const messages = ref<Message[]>(props.conversation?.messages || []);
 
 const pendingAttachments = defineModel('pendingAttachments', {
     type: Array as () => Attachment[],
@@ -83,7 +84,7 @@ function submit(): void {
                                 {{ message.content }}
                             </div>
 
-                            <div
+                            <!-- <div
                                 v-if="message.attachments?.length"
                                 class="flex flex-wrap justify-end gap-2"
                             >
@@ -107,10 +108,10 @@ function submit(): void {
                                         </p>
                                     </div>
                                 </div>
-                            </div>
+                            </div> -->
 
                             <span class="text-[11px] text-muted-foreground">{{
-                                message.timestamp
+                                formatDate(message.created_at)
                             }}</span>
                         </div>
                     </div>
@@ -124,16 +125,16 @@ function submit(): void {
 
                         <div class="flex min-w-0 flex-1 flex-col gap-2">
                             <div class="flex items-center gap-2">
-                                <span class="text-sm font-semibold">{{
+                                <!-- <span class="text-sm font-semibold">{{
                                     message.author
-                                }}</span>
+                                }}</span> -->
                                 <span
                                     class="text-[11px] text-muted-foreground"
-                                    >{{ message.timestamp }}</span
+                                    >{{ formatDate(message.created_at) }}</span
                                 >
                             </div>
 
-                            <div
+                            <!-- <div
                                 v-if="message.toolCalls?.length"
                                 class="flex flex-col gap-2 rounded-xl border bg-muted/40 p-3"
                             >
@@ -164,7 +165,7 @@ function submit(): void {
                                         >{{ tool.description }}</span
                                     >
                                 </div>
-                            </div>
+                            </div> -->
 
                             <div
                                 class="text-sm leading-relaxed whitespace-pre-line"

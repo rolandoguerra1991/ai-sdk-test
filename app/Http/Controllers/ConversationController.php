@@ -48,7 +48,16 @@ class ConversationController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        try {
+            $response = (new Assistant)
+                ->continue($request->input('conversation_id'), as: $request->user())
+                ->prompt($request->input('message'));
+
+            return response()->json($response);
+
+        } catch (\Throwable $th) {
+            return response()->json(['error' => $th->getMessage()], 500);
+        }
     }
 
     /**
