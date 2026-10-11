@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid, MessageSquare } from '@lucide/vue';
+import { BookOpen, FolderGit2, LayoutGrid, Sparkles } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -14,7 +14,8 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { chat, dashboard } from '@/routes';
+import { dashboard } from '@/routes';
+import { create as conversationCreate } from '@/routes/conversations';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -24,10 +25,10 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        title: 'Chat',
-        href: chat(),
-        icon: MessageSquare,
-    },
+        title: 'New Conversation',
+        href: conversationCreate(),
+        icon: Sparkles,
+    }
 ];
 
 const footerNavItems: NavItem[] = [

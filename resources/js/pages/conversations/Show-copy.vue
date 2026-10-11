@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, useHttp } from '@inertiajs/vue3';
 import {
     Bot,
-    Brain,
-    ChevronDown,
     CircleCheck,
     CornerDownLeft,
     FileSpreadsheet,
@@ -14,21 +12,19 @@ import {
     Paperclip,
     Send,
     Sparkles,
-    SquarePen,
     Wrench,
     X,
 } from '@lucide/vue';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { chat } from '@/routes';
 
 defineOptions({
     layout: {
         breadcrumbs: [
             {
                 title: 'Chat',
-                href: chat(),
+                href: '',
             },
         ],
     },
@@ -68,93 +64,23 @@ const attachmentIcons: Record<AttachmentKind, typeof FileText> = {
     document: FileText,
 };
 
-const messages: ChatMessage[] = [
-    {
-        id: 1,
-        role: 'user',
-        author: 'You',
-        timestamp: '10:24',
-        content:
-            'I need a summary of last quarter sales and to spot which regions grew the most.',
-        attachments: [
-            {
-                name: 'sales-q3.xlsx',
-                size: '248 KB',
-                kind: 'spreadsheet',
-            },
-        ],
-    },
-    {
-        id: 2,
-        role: 'assistant',
-        author: 'AI Agent',
-        timestamp: '10:24',
-        content: "Got it. I'll analyze the file and query the sales database.",
-        toolCalls: [
-            {
-                name: 'read_attachment',
-                description: 'sales-q3.xlsx · 1 sheet, 4,210 rows',
-                status: 'completed',
-            },
-            {
-                name: 'query_sales_database',
-                description: 'Grouping by region and quarter…',
-                status: 'completed',
-            },
-        ],
-    },
-    {
-        id: 3,
-        role: 'assistant',
-        author: 'AI Agent',
-        timestamp: '10:25',
-        content:
-            'Quarterly sales reached $1.24M, up 12% from the previous quarter.\n\nThe fastest-growing regions were:\n• North — +21%\n• Central — +14%\n• South — +4%',
-    },
-    {
-        id: 4,
-        role: 'user',
-        author: 'You',
-        timestamp: '10:27',
-        content:
-            'Great. Generate a monthly trend chart and save it as a report.',
-    },
-    {
-        id: 5,
-        role: 'assistant',
-        author: 'AI Agent',
-        timestamp: '10:27',
-        content: 'Working on the chart and the report…',
-        toolCalls: [
-            {
-                name: 'generate_chart',
-                description: 'Monthly trend · line',
-                status: 'completed',
-            },
-            {
-                name: 'save_report',
-                description: 'Writing report-q3.pdf…',
-                status: 'running',
-            },
-        ],
-    },
-];
+const messages: ChatMessage[] = [];
 
-const pendingAttachments: Attachment[] = [
-    {
-        name: 'dashboard-screenshot.png',
-        size: '1.2 MB',
-        kind: 'image',
-    },
-];
+const pendingAttachments: Attachment[] = [];
 
-const isThinking = true;
+const isThinking = false;
 
-const suggestedPrompts: string[] = [
-    'Summarize the previous report',
-    'Compare with Q2',
-    'Generate a table by region',
-];
+const suggestedPrompts: string[] = [];
+
+const http = useHttp({
+    message: '',
+});
+
+function submit(): void {
+    http.post('', {
+        onSuccess: () => http.reset('message'),
+    });
+}
 </script>
 
 <template>
@@ -163,59 +89,6 @@ const suggestedPrompts: string[] = [
     <h1 class="sr-only">Chat with the agent</h1>
 
     <div class="flex h-[calc(100svh-4rem)] flex-col md:h-[calc(100svh-5rem)]">
-        <header
-            class="flex shrink-0 items-center justify-between gap-4 border-b border-sidebar-border/70 px-4 py-3 md:px-6"
-        >
-            <div class="flex min-w-0 items-center gap-3">
-                <div class="relative">
-                    <Avatar class="size-10">
-                        <AvatarFallback class="bg-primary/10 text-primary">
-                            <Bot class="size-5" />
-                        </AvatarFallback>
-                    </Avatar>
-                    <span
-                        class="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-background bg-emerald-500"
-                    />
-                </div>
-                <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                        <h2 class="truncate text-sm font-semibold">AI Agent</h2>
-                        <Badge
-                            variant="secondary"
-                            class="hidden gap-1 sm:inline-flex"
-                        >
-                            <Sparkles class="size-3" />
-                            Agentic mode
-                        </Badge>
-                    </div>
-                    <p class="truncate text-xs text-muted-foreground">
-                        Online · gpt-4o model
-                    </p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    class="hidden gap-1 text-muted-foreground sm:inline-flex"
-                >
-                    <Brain class="size-4" />
-                    Reasoning
-                    <ChevronDown class="size-3.5" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    aria-label="New conversation"
-                >
-                    <SquarePen class="size-4" />
-                </Button>
-            </div>
-        </header>
-
         <div class="min-h-0 flex-1 overflow-y-auto">
             <div
                 class="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 md:px-6"
@@ -392,14 +265,17 @@ const suggestedPrompts: string[] = [
                     </div>
                 </div>
 
-                <div
+                <form
                     class="rounded-2xl border bg-card p-2 shadow-sm transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
+                    @submit.prevent="submit"
                 >
                     <textarea
+                        v-model="http.message"
                         rows="1"
                         aria-label="Message to the agent"
                         placeholder="Write a message to the agent…"
                         class="max-h-40 min-h-11 w-full resize-none bg-transparent px-2 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                        @keydown.enter.exact.prevent="submit"
                     />
 
                     <div
@@ -442,14 +318,18 @@ const suggestedPrompts: string[] = [
                             </span>
                             <Button
                                 size="icon"
-                                type="button"
+                                type="submit"
+                                :disabled="
+                                    http.processing ||
+                                    http.message.trim() === ''
+                                "
                                 aria-label="Send message"
                             >
                                 <Send class="size-4" />
                             </Button>
                         </div>
                     </div>
-                </div>
+                </form>
 
                 <div class="mt-3 flex flex-wrap justify-center gap-2">
                     <Badge
