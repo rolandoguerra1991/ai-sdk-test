@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import {
+import type {
     Attachment,
     AttachmentKind,
+    Conversation,
     Message,
-    Conversation
 } from '@/types/conversation';
 
 import {
     Bot,
-    CircleCheck,
     CornerDownLeft,
     FileSpreadsheet,
     FileText,
@@ -18,20 +17,22 @@ import {
     Paperclip,
     Send,
     Sparkles,
-    Wrench,
     X,
 } from '@lucide/vue';
+import { useJsonEventStream } from '@laravel/stream-vue';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { defineModel, ref } from 'vue';
+import { computed, defineModel, nextTick, reactive, ref } from 'vue';
 import { formatDate } from '@/lib/utils';
+
+type ChatMessage = Pick<Message, 'id' | 'role' | 'content' | 'created_at'>;
 
 const props = defineProps<{
     conversation?: Conversation;
-    onSubmit: () => void;
-    processing: boolean;
-}>()
+    streamUrl: string;
+    streamMethod: 'POST' | 'PATCH';
+    onConversationCreated?: (conversationId: string) => void;
+}>();
 
 const attachmentIcons: Record<AttachmentKind, typeof FileText> = {
     image: Image,
@@ -39,30 +40,154 @@ const attachmentIcons: Record<AttachmentKind, typeof FileText> = {
     document: FileText,
 };
 
-const messages = ref<Message[]>(props.conversation?.messages || []);
+const messages = ref<ChatMessage[]>(props.conversation?.messages || []);
 
 const pendingAttachments = defineModel('pendingAttachments', {
     type: Array as () => Attachment[],
     default: () => [],
 });
 
-const isThinking = false;
+const streamError = ref('');
+const messageList = ref<HTMLElement | null>(null);
+let activeAssistantMessage: ChatMessage | null = null;
+let activeConversationId: string | undefined;
+let completedSuccessfully = false;
+let streamFailed = false;
 
-const suggestedPrompts: string[] = [];
+type AgentStreamEvent = {
+    type: string;
+    threadId?: unknown;
+    delta?: unknown;
+    message?: unknown;
+};
+
+const { isFetching, isStreaming, send } = useJsonEventStream<
+    AgentStreamEvent,
+    { message: string }
+>(() => props.streamUrl, {
+    headers: {
+        Accept: 'application/json, text/event-stream',
+        'X-Requested-With': 'XMLHttpRequest',
+    },
+    onBeforeSend: (request) => ({
+        ...request,
+        method: props.streamMethod,
+    }),
+    onEvent: (event) => {
+        if (event.type === 'RUN_STARTED') {
+            if (typeof event.threadId === 'string') {
+                activeConversationId = event.threadId;
+            }
+        } else if (event.type === 'TEXT_MESSAGE_CONTENT') {
+            if (activeAssistantMessage && typeof event.delta === 'string') {
+                activeAssistantMessage.content += event.delta;
+                scrollToLatestMessage();
+            }
+        } else if (event.type === 'RUN_ERROR') {
+            streamFailed = true;
+            streamError.value =
+                typeof event.message === 'string'
+                    ? event.message
+                    : 'The assistant could not complete the response.';
+        } else if (event.type === 'RUN_FINISHED') {
+            completedSuccessfully = true;
+        }
+    },
+    onParseError: () => {
+        streamFailed = true;
+        streamError.value = 'The server returned an invalid stream event.';
+    },
+    onError: (error) => {
+        streamFailed = true;
+        streamError.value = error.message;
+    },
+    onFinish: () => {
+        if (!completedSuccessfully && !streamFailed) {
+            streamFailed = true;
+            streamError.value =
+                'The conversation stream ended before completion.';
+        }
+
+        if (completedSuccessfully && !streamFailed && !props.conversation) {
+            if (!activeConversationId) {
+                streamError.value =
+                    'The server did not identify the new conversation.';
+                return;
+            }
+
+            props.onConversationCreated?.(activeConversationId);
+        }
+    },
+});
+
+const isProcessing = computed(() => isFetching.value || isStreaming.value);
+const isThinking = computed(() => {
+    const lastMessage = messages.value[messages.value.length - 1];
+
+    return (
+        isProcessing.value &&
+        lastMessage?.role === 'assistant' &&
+        lastMessage.content === ''
+    );
+});
 
 const messageInput = defineModel('messageInput', {
     type: String,
     default: '',
 });
 
-function submit(): void {
-    if (messageInput.value.trim() === '') {
+function scrollToLatestMessage(force = false): void {
+    const element = messageList.value;
+
+    if (!element) {
         return;
     }
 
-    props.onSubmit();
+    const isNearBottom =
+        element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+
+    if (!force && !isNearBottom) {
+        return;
+    }
+
+    void nextTick(() => {
+        if (messageList.value) {
+            messageList.value.scrollTop = messageList.value.scrollHeight;
+        }
+    });
+}
+
+function submit(): void {
+    const submittedMessage = messageInput.value.trim();
+
+    if (submittedMessage === '' || isProcessing.value) {
+        return;
+    }
+
+    const now = new Date().toISOString();
+    const assistantMessage = reactive<ChatMessage>({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '',
+        created_at: now,
+    });
+
+    messages.value.push({
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: submittedMessage,
+        created_at: now,
+    });
+    messages.value.push(assistantMessage);
+    activeAssistantMessage = assistantMessage;
+    activeConversationId = undefined;
+    completedSuccessfully = false;
+    streamFailed = false;
+    scrollToLatestMessage(true);
+    streamError.value = '';
     messageInput.value = '';
     pendingAttachments.value.length = 0;
+    void send({ message: submittedMessage });
 }
 </script>
 
@@ -70,8 +195,10 @@ function submit(): void {
     <h1 class="sr-only">Chat with the agent</h1>
 
     <div class="flex h-[calc(100svh-4rem)] flex-col md:h-[calc(100svh-5rem)]">
-        <div class="min-h-0 flex-1 overflow-y-auto">
-            <div class="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 md:px-6">
+        <div ref="messageList" class="min-h-0 flex-1 overflow-y-auto">
+            <div
+                class="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 md:px-6"
+            >
                 <template v-for="message in messages" :key="message.id">
                     <div
                         v-if="message.role === 'user'"
@@ -116,7 +243,7 @@ function submit(): void {
                         </div>
                     </div>
 
-                    <div v-else class="flex gap-3">
+                    <div v-else-if="message.content !== ''" class="flex gap-3">
                         <Avatar class="mt-0.5 size-8 shrink-0">
                             <AvatarFallback class="bg-primary/10 text-primary">
                                 <Bot class="size-4" />
@@ -211,7 +338,9 @@ function submit(): void {
             </div>
         </div>
 
-        <div class="shrink-0 border-t border-sidebar-border/70 px-4 py-4 md:px-6">
+        <div
+            class="shrink-0 border-t border-sidebar-border/70 px-4 py-4 md:px-6"
+        >
             <div class="mx-auto w-full max-w-3xl">
                 <div
                     v-if="pendingAttachments.length"
@@ -241,6 +370,14 @@ function submit(): void {
                         </button>
                     </div>
                 </div>
+
+                <p
+                    v-if="streamError"
+                    role="alert"
+                    class="mb-2 text-sm text-destructive"
+                >
+                    {{ streamError }}
+                </p>
 
                 <form
                     class="rounded-2xl border bg-card p-2 shadow-sm transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
@@ -297,8 +434,7 @@ function submit(): void {
                                 size="icon"
                                 type="submit"
                                 :disabled="
-                                    props.processing ||
-                                    messageInput.trim() === ''
+                                    isProcessing || messageInput.trim() === ''
                                 "
                                 aria-label="Send message"
                             >
@@ -307,17 +443,6 @@ function submit(): void {
                         </div>
                     </div>
                 </form>
-
-                <div class="mt-3 flex flex-wrap justify-center gap-2">
-                    <Badge
-                        v-for="prompt in suggestedPrompts"
-                        :key="prompt"
-                        variant="outline"
-                        class="cursor-pointer font-normal text-muted-foreground"
-                    >
-                        {{ prompt }}
-                    </Badge>
-                </div>
 
                 <p class="mt-2 text-center text-[11px] text-muted-foreground">
                     The agent can use tools and make mistakes. Verify important

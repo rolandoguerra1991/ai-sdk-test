@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
-import { create, store } from '@/routes/conversations';
+import { Head, router } from '@inertiajs/vue3';
+import { create, show, store } from '@/routes/conversations';
 import ChatAgent from '@/components/ChatAgent.vue';
 
 defineOptions({
@@ -14,24 +14,17 @@ defineOptions({
     },
 });
 
-const form = useForm({
-    message: '',
-    attachments: [],
-});
-
-function submit() {
-    form.post(store().url);
+function openConversation(conversationId: string): void {
+    router.visit(show(conversationId).url);
 }
-
 </script>
 
 <template>
     <Head title="New Conversation" />
 
     <ChatAgent
-        :on-submit="submit"
-        :processing="form.processing"
-        v-model:messageInput="form.message"
-        v-model:pendingAttachments="form.attachments"
-     />
+        :stream-url="store().url"
+        stream-method="POST"
+        :on-conversation-created="openConversation"
+    />
 </template>

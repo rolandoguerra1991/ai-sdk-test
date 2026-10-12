@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Ai\Agents\Assistant;
 use Illuminate\Http\Request;
 use Laravel\Ai\Models\Conversation;
+use Symfony\Component\HttpFoundation\Response;
 
 class ConversationController extends Controller
 {
@@ -19,17 +20,21 @@ class ConversationController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): Response
     {
-        try {
-            $response = (new Assistant)
-                ->forUser($request->user())
-                ->prompt($request->input('message'));
+        $validated = $request->validate([
+            'message' => ['required', 'string'],
+        ]);
 
-            return to_route('conversations.show', $response->conversationId);
-        } catch (\Throwable $th) {
-            return back()->withErrors(['message' => $th->getMessage()]);
-        }
+        $response = (new Assistant)
+            ->forUser($request->user())
+            ->stream($validated['message'])
+            ->usingAgentUserInteractionProtocol()
+            ->toResponse($request);
+
+        $response->headers->set('X-Accel-Buffering', 'no');
+
+        return $response;
     }
 
     /**
@@ -38,6 +43,7 @@ class ConversationController extends Controller
     public function show(string $id)
     {
         $conversation = Conversation::with('messages')->findOrFail($id);
+
         return inertia('conversations/Show', [
             'conversation' => $conversation,
         ]);
@@ -46,18 +52,21 @@ class ConversationController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id): Response
     {
-        try {
-            $response = (new Assistant)
-                ->continue($request->input('conversation_id'), as: $request->user())
-                ->prompt($request->input('message'));
+        $validated = $request->validate([
+            'message' => ['required', 'string'],
+        ]);
 
-            return response()->json($response);
+        $response = (new Assistant)
+            ->continue($id, as: $request->user())
+            ->stream($validated['message'])
+            ->usingAgentUserInteractionProtocol()
+            ->toResponse($request);
 
-        } catch (\Throwable $th) {
-            return response()->json(['error' => $th->getMessage()], 500);
-        }
+        $response->headers->set('X-Accel-Buffering', 'no');
+
+        return $response;
     }
 
     /**
