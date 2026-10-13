@@ -14,8 +14,8 @@ use Laravel\Ai\Promptable;
 use Laravel\Ai\Providers\Tools\ProviderTool;
 use Stringable;
 
-#[Provider(Lab::Gemini)]
-#[Model('gemini-3.5-flash-lite')]
+#[Provider(Lab::Ollama)]
+#[Model('qwen2.5-coder:1.5b')]
 class Assistant implements Agent, Conversational, HasTools
 {
     use Promptable, RemembersConversations;
